@@ -1,0 +1,29 @@
+[
+  {
+    "id": "prod-1",
+    "name": "Cadeira ergonômica",
+    "sku": "CAD-001",
+    "category": "Móveis",
+    "price": 899.9,
+    "stock": 12,
+    "description": "Cadeira com apoio lombar e ajuste de altura."
+  },
+  {
+    "id": "prod-2",
+    "name": "Monitor 27\"",
+    "sku": "MON-027",
+    "category": "Eletrônicos",
+    "price": 1599.9,
+    "stock": 8,
+    "description": "Monitor IPS full HD com bordas finas."
+  },
+  {
+    "id": "prod-3",
+    "name": "Teclado mecânico",
+    "sku": "TEC-104",
+    "category": "Periféricos",
+    "price": 349.9,
+    "stock": 18,
+    "description": "Switch tátil, iluminação RGB e corpo em alumínio."
+  }
+]
