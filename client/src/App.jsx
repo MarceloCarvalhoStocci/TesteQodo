@@ -1,13 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 const emptyForm = {
   name: '',
   sku: '',
   category: '',
+  fornecedor: '',
   price: '',
   stock: '',
   description: ''
+}
+
+const emptyReviewForm = {
+  rating: '',
+  comment: '',
+  author: ''
 }
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -24,6 +31,13 @@ function App() {
   const [deletingId, setDeletingId] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+
+  const [reviewingProduct, setReviewingProduct] = useState(null)
+  const [reviews, setReviews] = useState([])
+  const [reviewForm, setReviewForm] = useState(emptyReviewForm)
+  const [savingReview, setSavingReview] = useState(false)
+  const [reviewError, setReviewError] = useState('')
+  const [reviewMessage, setReviewMessage] = useState('')
 
   const loadProducts = useCallback(async () => {
     try {
@@ -99,6 +113,93 @@ function App() {
     }))
   }
 
+  const loadReviews = useCallback(async (productId, signal) => {
+    try {
+      const response = await fetch(`/api/products/${productId}/reviews`, { signal })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || 'Falha ao carregar avaliações.')
+      }
+
+      const data = await response.json()
+      setReviews(Array.isArray(data) ? data : [])
+    } catch (err) {
+      if (err.name === 'AbortError') return
+      setReviews([])
+      setReviewError(err.message)
+    }
+  }, [])
+
+  const reviewAbortRef = useRef(null)
+
+  function openReviews(product) {
+    if (reviewAbortRef.current) {
+      reviewAbortRef.current.abort()
+    }
+
+    const controller = new AbortController()
+    reviewAbortRef.current = controller
+
+    setReviewingProduct(product)
+    setReviews([])
+    setReviewForm(emptyReviewForm)
+    setReviewError('')
+    setReviewMessage('')
+    loadReviews(product.id, controller.signal)
+  }
+
+  function closeReviews() {
+    if (reviewAbortRef.current) {
+      reviewAbortRef.current.abort()
+      reviewAbortRef.current = null
+    }
+
+    setReviewingProduct(null)
+    setReviews([])
+    setReviewForm(emptyReviewForm)
+    setReviewError('')
+    setReviewMessage('')
+  }
+
+  function handleReviewChange(event) {
+    const { name, value } = event.target
+    setReviewForm((current) => ({ ...current, [name]: value }))
+  }
+
+  async function handleReviewSubmit(event) {
+    event.preventDefault()
+    setSavingReview(true)
+    setReviewError('')
+    setReviewMessage('')
+
+    try {
+      const response = await fetch(`/api/products/${reviewingProduct.id}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rating: Number(reviewForm.rating),
+          comment: reviewForm.comment,
+          author: reviewForm.author
+        })
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Não foi possível salvar a avaliação.')
+      }
+
+      setReviewForm(emptyReviewForm)
+      setReviewMessage('Avaliação registrada com sucesso.')
+      await loadReviews(reviewingProduct.id)
+    } catch (err) {
+      setReviewError(err.message)
+    } finally {
+      setSavingReview(false)
+    }
+  }
+
   function startEditing(product) {
     setEditingId(product.id)
     setMessage('')
@@ -107,6 +208,7 @@ function App() {
       name: product.name ?? '',
       sku: product.sku ?? '',
       category: product.category ?? '',
+      fornecedor: product.fornecedor ?? '',
       price: String(product.price ?? ''),
       stock: String(product.stock ?? ''),
       description: product.description ?? ''
@@ -135,6 +237,7 @@ function App() {
         name: form.name.trim(),
         sku: form.sku.trim(),
         category: form.category.trim(),
+        fornecedor: form.fornecedor.trim(),
         price: Number(form.price),
         stock: Number.parseInt(form.stock, 10),
         description: form.description.trim()
@@ -270,6 +373,15 @@ function App() {
               />
             </label>
             <label>
+              Fornecedor
+              <input
+                name="fornecedor"
+                value={form.fornecedor}
+                onChange={handleChange}
+                placeholder="Ex.: TechImport S.A."
+              />
+            </label>
+            <label>
               Preço
               <input
                 name="price"
@@ -338,6 +450,7 @@ function App() {
                 <thead>
                   <tr>
                     <th>Produto</th>
+                    <th>Fornecedor</th>
                     <th>Categoria</th>
                     <th>Preço</th>
                     <th>Estoque</th>
@@ -352,6 +465,7 @@ function App() {
                         <p>{product.sku || 'Sem SKU'}</p>
                         <p className="table-description">{product.description || 'Sem descrição'}</p>
                       </td>
+                      <td>{product.fornecedor || 'Não informado'}</td>
                       <td>{product.category || 'Sem categoria'}</td>
                       <td>{currencyFormatter.format(Number(product.price || 0))}</td>
                       <td>{product.stock ?? 0}</td>
@@ -359,6 +473,13 @@ function App() {
                         <div className="row-actions">
                           <button type="button" className="link-button" onClick={() => startEditing(product)}>
                             Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="link-button"
+                            onClick={() => openReviews(product)}
+                          >
+                            Avaliar
                           </button>
                           <button
                             type="button"
@@ -378,6 +499,83 @@ function App() {
           ) : null}
         </section>
       </section>
+
+      {reviewingProduct ? (
+        <section className="panel reviews-panel" aria-label="Avaliações do produto">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Avaliações</p>
+              <h2>{reviewingProduct.name}</h2>
+            </div>
+            <button type="button" className="ghost-button" onClick={closeReviews}>
+              Fechar
+            </button>
+          </div>
+
+          <div className="reviews-list">
+            {reviews.length === 0 ? (
+              <p className="state-copy">Nenhuma avaliação ainda. Seja o primeiro a avaliar!</p>
+            ) : (
+              reviews.map((review) => (
+                <article key={review.id} className="review-card">
+                  <div className="review-header">
+                    <strong>{review.author}</strong>
+                    <span className="review-stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span>
+                  </div>
+                  {review.comment ? <p>{review.comment}</p> : null}
+                  <time className="review-date">{new Date(review.createdAt).toLocaleDateString('pt-BR')}</time>
+                </article>
+              ))
+            )}
+          </div>
+
+          <form className="review-form" onSubmit={handleReviewSubmit}>
+            <h3>Nova avaliação</h3>
+
+            <div className="field-grid">
+              <label>
+                Seu nome
+                <input
+                  name="author"
+                  value={reviewForm.author}
+                  onChange={handleReviewChange}
+                  placeholder="Ex.: João Silva"
+                />
+              </label>
+              <label>
+                Nota (1 a 5)
+                <select name="rating" value={reviewForm.rating} onChange={handleReviewChange} required>
+                  <option value="">Selecione...</option>
+                  <option value="1">1 – Péssimo</option>
+                  <option value="2">2 – Ruim</option>
+                  <option value="3">3 – Regular</option>
+                  <option value="4">4 – Bom</option>
+                  <option value="5">5 – Excelente</option>
+                </select>
+              </label>
+              <label className="full-width">
+                Comentário
+                <textarea
+                  name="comment"
+                  rows="3"
+                  value={reviewForm.comment}
+                  onChange={handleReviewChange}
+                  placeholder="Conte o que achou do produto..."
+                />
+              </label>
+            </div>
+
+            {reviewError ? <p className="feedback error">{reviewError}</p> : null}
+            {reviewMessage ? <p className="feedback success">{reviewMessage}</p> : null}
+
+            <div className="actions">
+              <button type="submit" className="primary-button" disabled={savingReview}>
+                {savingReview ? 'Enviando...' : 'Enviar avaliação'}
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
     </main>
   )
 }
