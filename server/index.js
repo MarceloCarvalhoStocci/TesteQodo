@@ -1,5 +1,5 @@
 import { startServer } from './app.js'
 
-process.env.PORT ||= '4011'
+process.env.PORT ||= '4101'
 
 startServer()

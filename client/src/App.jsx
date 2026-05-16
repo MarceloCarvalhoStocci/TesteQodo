@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 const emptyForm = {
@@ -113,25 +113,48 @@ function App() {
     }))
   }
 
-  const loadReviews = useCallback(async (productId) => {
+  const loadReviews = useCallback(async (productId, signal) => {
     try {
-      const response = await fetch(`/api/products/${productId}/reviews`)
+      const response = await fetch(`/api/products/${productId}/reviews`, { signal })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || 'Falha ao carregar avaliações.')
+      }
+
       const data = await response.json()
-      setReviews(data)
-    } catch {
+      setReviews(Array.isArray(data) ? data : [])
+    } catch (err) {
+      if (err.name === 'AbortError') return
       setReviews([])
+      setReviewError(err.message)
     }
   }, [])
 
+  const reviewAbortRef = useRef(null)
+
   function openReviews(product) {
+    if (reviewAbortRef.current) {
+      reviewAbortRef.current.abort()
+    }
+
+    const controller = new AbortController()
+    reviewAbortRef.current = controller
+
     setReviewingProduct(product)
+    setReviews([])
     setReviewForm(emptyReviewForm)
     setReviewError('')
     setReviewMessage('')
-    loadReviews(product.id)
+    loadReviews(product.id, controller.signal)
   }
 
   function closeReviews() {
+    if (reviewAbortRef.current) {
+      reviewAbortRef.current.abort()
+      reviewAbortRef.current = null
+    }
+
     setReviewingProduct(null)
     setReviews([])
     setReviewForm(emptyReviewForm)
