@@ -8,9 +8,10 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const dataDir = path.join(__dirname, 'data')
 const dataFile = path.join(dataDir, 'products.json')
+const reviewsFile = path.join(dataDir, 'reviews.json')
 
 const app = express()
-const port = process.env.PORT || 3001
+const port = process.env.PORT || 4101
 
 app.use(cors())
 app.use(express.json())
@@ -21,6 +22,7 @@ const defaultProducts = [
     name: 'Cadeira ergonômica',
     sku: 'CAD-001',
     category: 'Móveis',
+    fornecedor: 'Ergomóveis Ltda.',
     price: 899.9,
     stock: 12,
     description: 'Cadeira com apoio lombar e ajuste de altura.'
@@ -30,6 +32,7 @@ const defaultProducts = [
     name: 'Monitor 27"',
     sku: 'MON-027',
     category: 'Eletrônicos',
+    fornecedor: 'TechImport S.A.',
     price: 1599.9,
     stock: 8,
     description: 'Monitor IPS full HD com bordas finas.'
@@ -39,6 +42,7 @@ const defaultProducts = [
     name: 'Teclado mecânico',
     sku: 'TEC-104',
     category: 'Periféricos',
+    fornecedor: 'KeyMasters Brasil',
     price: 349.9,
     stock: 18,
     description: 'Switch tátil, iluminação RGB e corpo em alumínio.'
@@ -66,6 +70,20 @@ async function saveProducts(products) {
   await writeFile(dataFile, JSON.stringify(products, null, 2))
 }
 
+async function readReviews() {
+  await ensureStorage()
+  try {
+    const raw = await readFile(reviewsFile, 'utf8')
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+async function saveReviews(reviews) {
+  await writeFile(reviewsFile, JSON.stringify(reviews, null, 2))
+}
+
 function createId() {
   return `prod-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
@@ -75,6 +93,7 @@ function normalizeProduct(input, previous = {}) {
   const sku = String(input.sku ?? previous.sku ?? '').trim()
   const category = String(input.category ?? previous.category ?? '').trim()
   const description = String(input.description ?? previous.description ?? '').trim()
+  const fornecedor = String(input.fornecedor ?? previous.fornecedor ?? '').trim()
   const price = Number.parseFloat(input.price ?? previous.price ?? 0)
   const stock = Number.parseInt(input.stock ?? previous.stock ?? 0, 10)
 
@@ -95,6 +114,7 @@ function normalizeProduct(input, previous = {}) {
     name,
     sku,
     category,
+    fornecedor,
     description,
     price,
     stock
@@ -168,6 +188,44 @@ app.delete('/api/products/:id', async (request, response) => {
     response.status(204).send()
   } catch (error) {
     response.status(500).json({ message: 'Falha ao remover o produto.', detail: error.message })
+  }
+})
+
+app.get('/api/products/:id/reviews', async (request, response) => {
+  try {
+    const reviews = await readReviews()
+    response.json(reviews[request.params.id] || [])
+  } catch (error) {
+    response.status(500).json({ message: 'Falha ao carregar as avaliações.', detail: error.message })
+  }
+})
+
+app.post('/api/products/:id/reviews', async (request, response) => {
+  try {
+    const { rating, comment, author } = request.body
+    const parsedRating = Number(rating)
+
+    if (!rating || parsedRating < 1 || parsedRating > 5) {
+      return response.status(400).json({ message: 'A nota deve ser um número entre 1 e 5.' })
+    }
+
+    const reviews = await readReviews()
+    const productReviews = reviews[request.params.id] || []
+
+    const newReview = {
+      id: createId(),
+      rating: parsedRating,
+      comment: String(comment || '').trim(),
+      author: String(author || '').trim() || 'Anônimo',
+      createdAt: new Date().toISOString()
+    }
+
+    reviews[request.params.id] = [...productReviews, newReview]
+    await saveReviews(reviews)
+
+    response.status(201).json(newReview)
+  } catch (error) {
+    response.status(400).json({ message: error.message })
   }
 })
 

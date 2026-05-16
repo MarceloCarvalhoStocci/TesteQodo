@@ -290,6 +290,80 @@ td p {
   transform: none;
 }
 
+.reviews-panel {
+  margin-top: 24px;
+}
+
+.reviews-list {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.review-card {
+  background: rgba(99, 102, 241, 0.04);
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.review-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  gap: 12px;
+}
+
+.review-header strong {
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.review-stars {
+  color: #f59e0b;
+  letter-spacing: 0.05em;
+  font-size: 1.1rem;
+}
+
+.review-card p {
+  margin: 0 0 6px;
+  color: #334155;
+}
+
+.review-date {
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.review-form {
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  padding-top: 20px;
+}
+
+.review-form h3 {
+  margin: 0 0 16px;
+  font-size: 1rem;
+  color: #334155;
+}
+
+.field-grid select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 0.85rem 0.95rem;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  cursor: pointer;
+}
+
+.field-grid select:focus {
+  outline: 2px solid rgba(99, 102, 241, 0.18);
+  border-color: #6366f1;
+}
+
 @media (max-width: 1024px) {
   .hero,
   .content-grid,
